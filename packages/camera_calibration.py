@@ -103,6 +103,8 @@ class CameraCalibration(object):
         :param calibration_dict: Dictionary with keys 'mtx' and 'dist'.
         :return: Undistorted image.
         """
+        if img is None:
+            return None
 
         if 'mtx' not in calibration_dict or 'dist' not in calibration_dict:
             raise ValueError('Missing mtx or dist in calibration dictionary.')
