@@ -40,7 +40,7 @@ transform_path = 'image_transform'
 # Eye-balled position for perspective transformation
 transform_pts_a = [(565, 478), (740, 478), (1095, 675), (315, 675)]
 transform_pts_b = [(128, 128), (384, 128), (384, 512), (128, 512)]
-transform_dst_size = (512, 512)
+
 
 # Video files
 video_file = 'project_video.mp4'
@@ -102,9 +102,11 @@ transformer.load(transform_filename)
 # Playing a video from file is very well described in the opencv documentation:
 # https://docs.opencv.org/3.0-beta/doc/py_tutorials/py_gui/py_video_display/py_video_display.html
 
+# Instantiate Preprocessor
+preprocessor = LaneDetectorPreprocessor()
+
 # Instantiate LaneDetector
 detect = LaneDetector()
-
 
 # Open video file
 clip = cv2.VideoCapture(video_file)
@@ -121,11 +123,11 @@ while clip.isOpened():
 
     # Undistort the camera radial distortion
     frame = camera_cal.undistort_image(frame, calibration_dict=cal)
+
+    frame_orig = frame.copy()
+    transform_dst_size = (512, 512)
     frame = transformer.apply(frame, transform_dst_size)
     frame = cv2.blur(frame, ksize=(3, 3))
-
-    frame_clone = frame.copy()
-    #frame = cv2.resize(frame, (frame.shape[1] // 2, frame.shape[0] // 2))
 
     binary_mask = np.zeros(shape=(frame.shape[0], frame.shape[1], 1), dtype=np.uint8)
 
@@ -140,32 +142,38 @@ while clip.isOpened():
     condition_grad = (direction >= 0.0) & (direction <= 0.78)
     condition_grad &= (mag >= 15) & (mag <= 255)
 
-    condition_color = (frame_S[:, :, 0] >= 96) & (frame_S[:, :, 0] <= 255)
-    #condition_color_fine = (frame_S[:, :, 0] >= 35) & (frame_S[:, :, 0] <= 255)
+    condition_color = (frame_S[:, :, 0] >= 200) & (frame_S[:, :, 0] <= 255)
 
     conditions_combination[:, :, 0] = condition_grad * 255
     conditions_combination[:, :, 1] = condition_color * 255
-    #conditions_combination[:, :, 2] = condition_color_fine * 128
 
     binary_mask[condition_color | condition_grad] = 255
-    # binary_mask = cv2.dilate(binary_mask, np.ones((3, 3), np.uint8), 1)
+
     binary_mask = cv2.erode(binary_mask, np.ones((2, 2), np.uint8), 1)
-    binary_mask = cv2.resize(binary_mask, (frame_clone.shape[1], frame_clone.shape[0]))
+    binary_mask = cv2.resize(binary_mask, (frame.shape[1], frame.shape[0]))
 
-    # transformed = transformer.apply(binary_mask, transform_dst_size)
-    # transformed = transformer.apply(frame_clone, transform_dst_size)
+    # Compute the lane polynomials, the curvature and the offset
+    binary_mask, lane_image, curvature, offset = detect.find_lanes_hist_peaks(binary_mask)
 
-    # binary_mask = cv2.resize(binary_mask, (frame_clone.shape[1] // 2, frame_clone.shape[0] // 2))
+    # Warp the lane image back to original perspective and add weighted
+    lane_image = transformer.apply_inv(lane_image, (frame_orig.shape[1], frame_orig.shape[0]))
+    lane_image = cv2.addWeighted(frame_orig, 1, lane_image, 0.3, 0)
 
-    binary_mask = detect.find_lanes_hist_peaks(binary_mask)
+    # Paint the text to the image
+    offset_dir_text = ' left from center' if offset > 0 else ' right from center'
+    cv2.putText(lane_image, 'Radius of Curvature = ' + str(int(curvature)) + '(m)', (25, 75),
+                cv2.FONT_HERSHEY_SIMPLEX, 2, (200, 200, 200), 2)
+    cv2.putText(lane_image, 'Vehicle is ' + str(abs(int(offset * 100) / 100.0)) + 'm' + offset_dir_text, (25, 150),
+                cv2.FONT_HERSHEY_SIMPLEX, 2, (200, 200, 200), 2)
 
     cv2.imshow('mag', mag)
     cv2.imshow('conditions', conditions_combination)
     cv2.imshow('bin', binary_mask)
     cv2.imshow('S_channel', frame_S)
-    cv2.imshow('win', frame)
-    #cv2.imshow('transformed', transformed)
-    cv2.waitKey(33)
+    cv2.imshow('transformed', frame)
+    #cv2.imshow('frame', frame_orig)
+    cv2.imshow('lane', lane_image)
+    cv2.waitKey(1)
 
 clip.release()
 

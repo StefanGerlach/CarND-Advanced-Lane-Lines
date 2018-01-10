@@ -10,12 +10,13 @@ class PerspectiveTransform(object):
     def __init__(self):
         # Initialize transformation matrix with identity matrix for no change.
         self._matrix = np.identity(3)
+        self._inv_matrix = np.identity(3)
 
     def save(self, fn: str):
         """
         Saves the matrix to file.
         """
-        pickle.dump(dict({'transform': self._matrix}), open(fn, 'wb'))
+        pickle.dump(dict({'transform': self._matrix, 'inverse': self._inv_matrix}), open(fn, 'wb'))
 
     def load(self, fn: str):
         """
@@ -28,10 +29,11 @@ class PerspectiveTransform(object):
             raise FileNotFoundError('Could not find file '+fn+' !')
 
         pickle_dict = pickle.load(open(fn, 'rb'))
-        if 'transform' not in pickle_dict:
-            raise ValueError('Could not find key <transform> in pickle file')
+        if 'transform' not in pickle_dict or 'inverse' not in pickle_dict:
+            raise ValueError('Could not find key <transform> or <inverse> in pickle file')
 
         self._matrix = pickle_dict['transform']
+        self._inv_matrix = pickle_dict['inverse']
 
     def from_points_pair(self, pts_src, pts_dst):
         """
@@ -43,6 +45,7 @@ class PerspectiveTransform(object):
             raise ValueError('Needs exactly 4 points in list.')
 
         self._matrix = cv2.getPerspectiveTransform(np.float32(pts_src), np.float32(pts_dst))
+        self._inv_matrix = cv2.getPerspectiveTransform(np.float32(pts_dst), np.float32(pts_src))
 
     def apply(self, img, dst_size=None):
         """
@@ -56,6 +59,19 @@ class PerspectiveTransform(object):
             dsize = dst_size
 
         return cv2.warpPerspective(img, self._matrix, dsize)
+
+    def apply_inv(self, img, dst_size=None):
+        """
+        Returns the input image transformed by the inverse 'self'-transformation matrix
+        :param img: input image
+        :return: transformed image.
+        """
+        if dst_size is None:
+            dsize = (img.shape[1], img.shape[0])
+        else:
+            dsize = dst_size
+
+        return cv2.warpPerspective(img, self._inv_matrix, dsize)
 
 
 """

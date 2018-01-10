@@ -1,11 +1,10 @@
 """ This module implements the analysis of the transformed binary image """
 import numpy as np
 import cv2
-import matplotlib.pyplot as plt
 
 
 class LaneDetector(object):
-    def __init__(self, filter_len=30, polyfilter_len=10):
+    def __init__(self, filter_len=30, polyfilter_len=20):
         # The length of the smoothing filter
         self._filter_len = filter_len
         self._polyfilter_len = polyfilter_len
@@ -36,7 +35,7 @@ class LaneDetector(object):
             return np.mean([x[0] for x in self._poly_detections], axis=0), \
                    np.mean([x[1] for x in self._poly_detections], axis=0)
 
-        return None
+        return None, None
 
     def __add_to_detections(self, detection):
         """
@@ -172,23 +171,8 @@ class LaneDetector(object):
             for height in reversed(range(0, bin_warped_img.shape[0] + win_slide_size[0], win_slide_size[0])):
                 max_signal = -1
                 max_width = -1
-                """
-                For debugging visualization:
-                cv2.circle(bin_warped_img, (seed_peak, height), 2, 128, 2)
-                cv2.imshow('to_slice', bin_warped_img)
-                """
                 for width in range(seed_peak - shift_threshold, seed_peak):
                     # look for the strongest signal in this horizontal slice
-                    """
-                    For debugging visualization:
-                    if height > bin_warped_img.shape[1]:
-                        cv_height = bin_warped_img.shape[1]-win_slide_size[0]
-                    else:
-                        cv_height = height
-                    cv2.imshow('slice', bin_warped_img[cv_height:cv_height+win_slide_size[0],
-                                        width:width+win_slide_size[1]])
-                    cv2.waitKey()
-                    """
                     non_zeros = np.count_nonzero(bin_warped_img[height:height+win_slide_size[0],
                                                                 width:width+win_slide_size[1]])
                     if non_zeros > abs_intensity_threshold and non_zeros > max_signal:
@@ -198,13 +182,6 @@ class LaneDetector(object):
                 if max_signal > 0:
                     seed_peak = max_width + (win_slide_size[1] // 2)
                     lane_positions[i].append([height, max_width + (win_slide_size[1] // 2)])
-                    """
-                    For debugging visualization:
-                    print('adding position ', height, max_width + (win_slide_size[1] // 2))
-                    cv2.circle(bin_warped_img, (max_width + (win_slide_size[1] // 2), height), 2, 64, 2)
-                    cv2.imshow('to_slice', bin_warped_img)
-                    """
-        # For every detected position, the underlying pixels are declared as the lane mask
 
         return lane_positions
 
@@ -234,6 +211,9 @@ class LaneDetector(object):
         left_pxs = np.where(mask_left > 0)
         rigth_pxs = np.where(mask_right > 0)
 
+        if len(rigth_pxs[0]) <= 0 or len(left_pxs[0]) <= 0:
+            return None, None
+
         left_poly = np.polyfit(left_pxs[0], left_pxs[1], 2)
         right_poly = np.polyfit(rigth_pxs[0], rigth_pxs[1], 2)
 
@@ -246,27 +226,79 @@ class LaneDetector(object):
         :param poly: The polynomial.
         :return: Image with inpainted polynomial.
         """
+        if poly is None:
+            return img
+
         ys = np.linspace(0, img.shape[0] - 1, img.shape[0])
         xs = poly[0] * ys ** 2 + poly[1] * ys + poly[2]
         for pt in zip(xs, ys):
-            if int(pt[0]) < img.shape[0] and int(pt[1]) < img.shape[1]:
+            if int(pt[0]) < img.shape[0] and int(pt[1]) < img.shape[1] and int(pt[0]) >= 0 and int(pt[1]) > 0:
                 img[int(pt[1]), int(pt[0])] = 255
 
         return img
 
     def filter_poly(self, poly_left, poly_right):
-
         # Push the current polynomials to filter sequence
-        self.__add_to_poly_detections([poly_left, poly_right])
+        if poly_left is not None and poly_right is not None:
+            self.__add_to_poly_detections([poly_left, poly_right])
 
-        # Get Mean of last n polys
-        filtered_left, filtered_right = self.__get_mean_of_polynomials()
+        # Get Mean of last n polynomials
+        return self.__get_mean_of_polynomials()
 
-        return filtered_left, filtered_right
+    def calc_radius_offset_poly(self, poly_left, poly_right, image_width, image_height):
+        # Define conversions in x and y from pixels space to meters
+        ym_per_pix = 30 / 720    # meters per pixel in y dimension
+        xm_per_pix = 3.7 / 700  # meters per pixel in x dimension
+
+        # Calculate the offset of the car to center
+        left_pos = (poly_left[0] * image_height ** 2 + poly_left[1] * image_height + poly_left[2]) - (image_width / 2)
+        right_pos = (poly_right[0] * image_height ** 2 + poly_right[1] * image_height + poly_right[2]) - (image_width / 2)
+
+        # Check if vehicle is left or right from center
+        if abs(left_pos) > abs(right_pos):
+            offset = -abs(right_pos-abs(left_pos))*xm_per_pix
+        else:
+            offset = abs(right_pos-abs(left_pos))*xm_per_pix
+
+        # Convert polys to world space by recalculating them
+        ys = np.linspace(0, image_height, num=image_height)
+        xs_left = []
+        xs_right = []
+        for y in ys:
+            xs_left.append(poly_left[0] * y ** 2 + poly_left[1] * y + poly_left[2])
+            xs_right.append(poly_right[0] * y ** 2 + poly_right[1] * y + poly_right[2])
+
+        # Create hstack from points for opencv fillPoly
+        pts_left = np.array([np.transpose(np.vstack([xs_left, ys]))])
+        pts_right = np.array([np.flipud(np.transpose(np.vstack([xs_right, ys])))])
+        poly = np.hstack((pts_left, pts_right))
+
+        # Fit new polynomials to x,y in world space
+        poly_left_meters = np.polyfit(ys * ym_per_pix, np.array(xs_left) * xm_per_pix, 2)
+        poly_right_meters = np.polyfit(ys * ym_per_pix, np.array(xs_right) * xm_per_pix, 2)
+
+        # Calculate the new radii of curvature
+        left_curverad = ((1 + (2 * poly_left_meters[0] * image_height * ym_per_pix + poly_left_meters[1]) ** 2) ** 1.5) \
+                        / np.absolute(2 * poly_left_meters[0])
+        right_curverad = ((1 + (2 * poly_right_meters[0] * image_height * ym_per_pix + poly_right_meters[1]) ** 2)
+                          ** 1.5) / np.absolute(2 * poly_right_meters[0])
+
+        radius = (left_curverad + right_curverad) / 2
+        return radius, offset, poly
 
     def find_lanes_hist_peaks(self, bin_warped_img):
         # Window size for detection and inpainting
         win_size = (42, 42)
+
+        # Current polynomials for the lanes
+        poly_left = None
+        poly_right = None
+        poly = None
+        radius_of_curvature = -1
+        offset_to_center = -1
+
+        mask_left = np.zeros_like(bin_warped_img)
+        mask_right = np.zeros_like(bin_warped_img)
 
         # First step is to identify histogram peaks in the histogram of sums of the lower image part
         bare_peaks = self.find_lanes_hist_peaks_initial(bin_warped_img)
@@ -276,15 +308,29 @@ class LaneDetector(object):
 
         # With the filtered 2 peaks, the lanes are identified by using the sliding window approach
         lane_posit = self.find_lanes_hist_peaks_lane_positions(bin_warped_img, filt_peaks, intensity_threshold=0.05, win_slide_size=win_size)
+        if lane_posit[0] is not None:
+            # With the rough positions, the pixels are identified
+            mask_left, mask_right = self.find_lanes_hist_peaks_lane_pixels(bin_warped_img, lane_posit, win_slide_size=win_size)
 
-        # With the rough positions, the pixels are identified
-        mask_left, mask_right = self.find_lanes_hist_peaks_lane_pixels(bin_warped_img, lane_posit, win_slide_size=win_size)
+            if mask_left is not None and mask_right is not None:
 
-        # Fit the polynomials into the mask pixels
-        poly_left, poly_right = self.fit_poly(mask_left, mask_right)
+                # Fit the polynomials into the mask pixels
+                poly_left, poly_right = self.fit_poly(mask_left, mask_right)
 
         # Filter the polynomials
         poly_left, poly_right = self.filter_poly(poly_left, poly_right)
+
+        # Compute the radius of curvature and the position with respect to center
+        if poly_left is not None and poly_right is not None:
+            radius_of_curvature, offset_to_center, poly = self.calc_radius_offset_poly(poly_left,
+                                                                                       poly_right,
+                                                                                       bin_warped_img.shape[1],
+                                                                                       bin_warped_img.shape[0])
+
+        # Prepare the image for the inpainted green lane
+        image_with_lane = np.zeros(shape=(bin_warped_img.shape[0], bin_warped_img.shape[1], 3), dtype=np.uint8)
+        if poly is not None:
+            cv2.fillPoly(image_with_lane, np.int_([poly]), (0, 255, 0))
 
         image_with_polys = np.zeros_like(bin_warped_img)
         image_with_polys = self.draw_poly(image_with_polys, poly_left)
@@ -300,11 +346,12 @@ class LaneDetector(object):
         inpainted_lanes[:, :, :][image_with_polys > 0] = [0, 255, 255]
 
         for pos in lane_posit:
-            for point in pos:
-                pt1 = (point[1] - (win_size[0] // 2), point[0] - (win_size[0] // 2))
-                pt2 = (point[1] + (win_size[0] // 2), point[0] + (win_size[0] // 2))
-                cv2.rectangle(inpainted_lanes, pt1, pt2, (0, 128, 0), 1)
+            if pos:
+                for point in pos:
+                    pt1 = (point[1] - (win_size[0] // 2), point[0] - (win_size[0] // 2))
+                    pt2 = (point[1] + (win_size[0] // 2), point[0] + (win_size[0] // 2))
+                    cv2.rectangle(inpainted_lanes, pt1, pt2, (0, 128, 0), 1)
 
-        return inpainted_lanes
+        return inpainted_lanes, image_with_lane, radius_of_curvature, offset_to_center
 
 
