@@ -15,13 +15,11 @@ Here the single modules will be called that do:
 
 import os
 import cv2
-import numpy as np
 import matplotlib.pyplot as plt
 
 from packages.camera_calibration import CameraCalibration
 from packages.image_transform import PerspectiveTransform
-from packages.image_color_transform import ColorTransformer
-from packages.image_gradient import Gradient
+from packages.image_preprocessing import LaneDetectorPreprocessor
 from packages.lane_detection import LaneDetector
 
 
@@ -38,9 +36,9 @@ camera_id = 'udacity_video_camera'
 transform_path = 'image_transform'
 
 # Eye-balled position for perspective transformation
+transform_dst_size = (512, 768)
 transform_pts_a = [(565, 478), (740, 478), (1095, 675), (315, 675)]
-transform_pts_b = [(128, 128), (384, 128), (384, 512), (128, 512)]
-
+transform_pts_b = [(128, 384), (384, 384), (384, 768), (128, 768)]
 
 # Video files
 video_file = 'project_video.mp4'
@@ -111,8 +109,6 @@ detect = LaneDetector()
 # Open video file
 clip = cv2.VideoCapture(video_file)
 
-# Preprocessing
-clahe = cv2.createCLAHE(clipLimit=2.0, tileGridSize=(32, 32))
 
 # Iterate all frames of the video
 frame_id = 0
@@ -124,40 +120,18 @@ while clip.isOpened():
     # Undistort the camera radial distortion
     frame = camera_cal.undistort_image(frame, calibration_dict=cal)
 
-    frame_orig = frame.copy()
-    transform_dst_size = (512, 512)
-    frame = transformer.apply(frame, transform_dst_size)
-    frame = cv2.blur(frame, ksize=(3, 3))
+    # Transform the camera image into bird-eye perspective and crop
+    frame_bird_eye = transformer.apply(frame, transform_dst_size)
 
-    binary_mask = np.zeros(shape=(frame.shape[0], frame.shape[1], 1), dtype=np.uint8)
+    # Preprocess the bird-eye image into a binary image with lanes as ones
+    binary_mask, s_channel, magnitude_img, conditions_combination = preprocessor.preprocess(frame_bird_eye)
 
-    # Extract the S - Channel from HLS-Colorspace of this frame
-    frame_S = np.expand_dims(ColorTransformer.transformBGR2HLS(frame)[:, :, 2], axis=-1)
-    frame_S[:, :, 0] = clahe.apply(frame_S)
-
-    sobel_x, sobel_y, mag, direction = Gradient.get_gradient_images(frame_S, sobel_kernel_size=5)
-
-    conditions_combination = np.zeros(shape=(frame_S.shape[0], frame_S.shape[1], 3), dtype=np.uint8)
-
-    condition_grad = (direction >= 0.0) & (direction <= 0.78)
-    condition_grad &= (mag >= 15) & (mag <= 255)
-
-    condition_color = (frame_S[:, :, 0] >= 200) & (frame_S[:, :, 0] <= 255)
-
-    conditions_combination[:, :, 0] = condition_grad * 255
-    conditions_combination[:, :, 1] = condition_color * 255
-
-    binary_mask[condition_color | condition_grad] = 255
-
-    binary_mask = cv2.erode(binary_mask, np.ones((2, 2), np.uint8), 1)
-    binary_mask = cv2.resize(binary_mask, (frame.shape[1], frame.shape[0]))
-
-    # Compute the lane polynomials, the curvature and the offset
+    # Compute the lane polynomials, the curvature and the offset from binary_mask
     binary_mask, lane_image, curvature, offset = detect.find_lanes_hist_peaks(binary_mask)
 
     # Warp the lane image back to original perspective and add weighted
-    lane_image = transformer.apply_inv(lane_image, (frame_orig.shape[1], frame_orig.shape[0]))
-    lane_image = cv2.addWeighted(frame_orig, 1, lane_image, 0.3, 0)
+    lane_image = transformer.apply_inv(lane_image, (frame.shape[1], frame.shape[0]))
+    lane_image = cv2.addWeighted(frame, 1, lane_image, 0.3, 0)
 
     # Paint the text to the image
     offset_dir_text = ' left from center' if offset > 0 else ' right from center'
@@ -166,13 +140,14 @@ while clip.isOpened():
     cv2.putText(lane_image, 'Vehicle is ' + str(abs(int(offset * 100) / 100.0)) + 'm' + offset_dir_text, (25, 150),
                 cv2.FONT_HERSHEY_SIMPLEX, 2, (200, 200, 200), 2)
 
-    cv2.imshow('mag', mag)
+    cv2.imshow('mag', magnitude_img)
     cv2.imshow('conditions', conditions_combination)
     cv2.imshow('bin', binary_mask)
-    cv2.imshow('S_channel', frame_S)
-    cv2.imshow('transformed', frame)
-    #cv2.imshow('frame', frame_orig)
+    cv2.imshow('S_channel', s_channel)
+    cv2.imshow('transformed', frame_bird_eye)
     cv2.imshow('lane', lane_image)
+
+
     cv2.waitKey(1)
 
 clip.release()

@@ -37,6 +37,9 @@ class LaneDetector(object):
 
         return None, None
 
+    def __get_last_of_polynomials(self):
+        return self._poly_detections[-1]
+
     def __add_to_detections(self, detection):
         """
         Helper function to push an element in filter sequence
@@ -232,7 +235,7 @@ class LaneDetector(object):
         ys = np.linspace(0, img.shape[0] - 1, img.shape[0])
         xs = poly[0] * ys ** 2 + poly[1] * ys + poly[2]
         for pt in zip(xs, ys):
-            if int(pt[0]) < img.shape[0] and int(pt[1]) < img.shape[1] and int(pt[0]) >= 0 and int(pt[1]) > 0:
+            if int(pt[0]) < img.shape[1] and int(pt[1]) < img.shape[0] and int(pt[0]) >= 0 and int(pt[1]) > 0:
                 img[int(pt[1]), int(pt[0])] = 255
 
         return img
@@ -241,6 +244,9 @@ class LaneDetector(object):
         # Push the current polynomials to filter sequence
         if poly_left is not None and poly_right is not None:
             self.__add_to_poly_detections([poly_left, poly_right])
+        else:
+            # if the incoming polys are None, return the last
+            return self.__get_last_of_polynomials()
 
         # Get Mean of last n polynomials
         return self.__get_mean_of_polynomials()
@@ -286,6 +292,32 @@ class LaneDetector(object):
         radius = (left_curverad + right_curverad) / 2
         return radius, offset, poly
 
+    def sanity_check_poly(self, poly_left, poly_right, t_A=None, t_B=0.2):
+        """
+        This function performs a basic sanity check on the 2 polynomials of f(y) = Ay2 * By + C
+        :param poly_left: The polynomial of the left lane.
+        :param poly_right: The polynomial of the right lane.
+        :param t_A: If the absolute difference of A_left and A_right is greater than t_A, None, None is returned.
+        :param t_B: The same as t_A but for B_left and B_right
+        :return: None, None if thresholds were exceeded.
+        """
+        # Check if polys are None
+        if poly_left is None or poly_right is None:
+            return None, None
+
+        abs_diffs = []
+        for i in range(len(poly_left)):
+            abs_diffs.append(int(abs(poly_left[i] - poly_right[i]) * 100) / 100.0)
+
+        if t_A is not None and abs_diffs[0] > t_A:
+            return None, None
+
+        if t_B is not None and abs_diffs[1] > t_B:
+            return None, None
+
+        return poly_left, poly_right
+
+
     def find_lanes_hist_peaks(self, bin_warped_img):
         # Window size for detection and inpainting
         win_size = (42, 42)
@@ -317,6 +349,12 @@ class LaneDetector(object):
                 # Fit the polynomials into the mask pixels
                 poly_left, poly_right = self.fit_poly(mask_left, mask_right)
 
+                # Do a basic sanity check for polynomials
+                poly_left, poly_right = self.sanity_check_poly(poly_left, poly_right)
+
+        # Check if pipeline failed.
+        new_polys = poly_left is not None and poly_right is not None
+
         # Filter the polynomials
         poly_left, poly_right = self.filter_poly(poly_left, poly_right)
 
@@ -330,7 +368,8 @@ class LaneDetector(object):
         # Prepare the image for the inpainted green lane
         image_with_lane = np.zeros(shape=(bin_warped_img.shape[0], bin_warped_img.shape[1], 3), dtype=np.uint8)
         if poly is not None:
-            cv2.fillPoly(image_with_lane, np.int_([poly]), (0, 255, 0))
+            color = (0, 255, 0) if new_polys else (0, 255, 196)
+            cv2.fillPoly(image_with_lane, np.int_([poly]), color)
 
         image_with_polys = np.zeros_like(bin_warped_img)
         image_with_polys = self.draw_poly(image_with_polys, poly_left)
