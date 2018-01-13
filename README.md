@@ -74,6 +74,10 @@ To better detect lane lines and reduce the area of the image to look for lane li
 The class **PerspectiveTransform** in this repositiory (/packages/image_transform.py) uses OpenCV functions to compute a perspective transformation matrix (and its inverse). All that is needed to do this are 4 points in the source image and 4 points (e.g. defining a rectangle) in the destination image. With these 4 point correspondences and the OpenCV function *getPerspectiveTransform()* the transformation matrix is computed.
 
 I used 4 points in the original image, that define a rectangle that lays on the road lane and 4 points in the destination image, that define a rectangle in the image plane. The next image visualizes these rectangles with green lines and the point correspondences with red lines:
+
 ![Perspective Transformation][image6]
+
+
+At this point I continued working with all other algorithms on the transformed image, because only the necessary image information are contained in the warped image. Additionally computation time was reduced, working on the warped image with size (512, 786) instead of the original image size (1280, 720).
 
 
