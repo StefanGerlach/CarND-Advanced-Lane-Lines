@@ -18,6 +18,8 @@ import cv2
 import numpy as np
 import matplotlib.pyplot as plt
 
+from moviepy.editor import ImageSequenceClip
+
 from packages.camera_calibration import CameraCalibration
 from packages.image_transform import PerspectiveTransform
 from packages.image_preprocessing import LaneDetectorPreprocessor
@@ -28,6 +30,10 @@ from packages.lane_detection import LaneDetector
 
 # For intermediate outputs
 output_path = 'output_images'
+output_video_frames = 'video_frames'
+
+# For Video output
+output_video_file = 'output_video.mp4'
 
 # For input of camera calibration
 cal_path = 'camera_cal'
@@ -120,6 +126,8 @@ while clip.isOpened():
     if frame is None:
         break
 
+    frame_id += 1
+
     # Undistort the camera radial distortion
     frame = camera_cal.undistort_image(frame, calibration_dict=cal)
 
@@ -160,8 +168,21 @@ while clip.isOpened():
 
     # Put Border for 16:9 scaling
     inpaint = cv2.resize(cv2.copyMakeBorder(inpaint, 0, 0, 512, 512, cv2.BORDER_CONSTANT), (1920, 1080))
+
     cv2.imshow('Lane Detection', inpaint)
     cv2.waitKey(1)
 
+    # Save this Frame
+    if os.path.exists(output_video_frames) is False:
+        os.makedirs(output_video_frames)
+
+    cv2.imwrite(os.path.join(output_video_frames, 'frame_' + str(frame_id).zfill(4)+'.png'), inpaint)
+
 clip.release()
 
+# Create output video
+print('Creating Video.')
+
+video_file = output_video_file
+clip = ImageSequenceClip(output_video_frames, fps=30)
+clip.write_videofile(video_file)
