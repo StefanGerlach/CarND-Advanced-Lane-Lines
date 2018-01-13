@@ -84,5 +84,10 @@ At this point I continued working with all other algorithms on the transformed i
 
 ## Result
 
+To visualize my result on the project video I uploaded a video on YouTube. The inpainted lane changes the color from green to orange, if the detection in the frame was not confident enough.
+
+The Debug-images in the lower part display (from left to right) the bird eye view of the image part in front of the car (perspective transform), the S-channel from HLS-Colorspace, the magnitude image from edge detection with sobel filtering, a composite binary premasking of lane pixels and the lane detections with corresponding inpainted polynomials.
+
+Please click on the image to watch the video on YouTube:
 [![Youtube Link][image7]](https://youtu.be/iSw3WAGySTk "Udacity Self Driving Car ND Project 4 - Advanced Lane Finding")
 
