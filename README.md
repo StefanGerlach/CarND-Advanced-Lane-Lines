@@ -7,6 +7,7 @@
 [image3]: ./output_images/chessboard_detect.png "Camera Calibration Chessboard"
 [image4]: ./output_images/frame_undistort.png "Camera Calibration Video Frame"
 [image5]: ./output_images/diff_img.png "Camera Calibration Video Frame Difference Image"
+[image6]: ./output_images/warp_perspective.png "Warp Perspective"
 
 In this repository I describe my approach to write a software pipeline that identifies the lane of the road in front of a car in a video file. The precise requirements of this project are:
 
@@ -20,6 +21,19 @@ In this repository I describe my approach to write a software pipeline that iden
 * Output visual display of the lane boundaries and numerical estimation of lane curvature and vehicle position.
 
 In the following writeup I describe how I managed to solve the requirements.
+
+
+##  Code description
+
+This overview describes the project structure and modules:
+
+* packages/camera_calibration.py containing a class for camera calibration 
+* packages/image_color_transform.py containing a class that serves as small wrapper for OpenCV cvtColor function
+* packages/image_transform.py class PerspectiveTransform for perspective transformations (create, load, save)
+* packages/image_gradient.py.py class Gradient for computing edge-images and meta images like magnitude and direction of gradients
+* packages/image_preprocessing.py.py class LaneDetectorPreprocessor for creating the binary mask of lane pixels
+* packages/lane_detection.py class LaneDetector for detection and filtering of the lane polynomials
+* main.py the main pipeline putting it all together
 
 
 ##  Compute the camera calibration matrix
@@ -39,6 +53,7 @@ For computing the camera matrix and distortion coefficients, [OpenCV](https://op
   * Finally the function *undistort* uses them to undistort an image. The following image visualizes the impact of radial camera distortion and the output of the undistorted image:
   ![Camera Calibration][image2]
 
+
 ## Apply a distortion correction to raw images
 
 Using the computed camera calibration matrix and distortion coefficients, the image processing pipeline of this projects start with undistorting every image, before any other image process routines begin:
@@ -51,5 +66,11 @@ To better visualize the difference between these two images, the following shows
 
 To implement this step, I created the **CameraCalibration** class in packages\camera_calibration.py. It uses the described OpenCV functions to compute and apply the camera matrix and distortion coefficients.
 
+
+## Apply a perspective transform for "birds-eye view"
+
+To better detect lane lines and reduce the area of the image to look for lane lines, it is usefull to create a warped version of the original frame. This warped version looks like from "the eyes of a bird", it displays the image content from the "top". This warping is called perspective transformation and can be done by multiplying the image pixel positions by a perspective transformation matrix.
+
+![Perspective Transformation][image6]
 
 
