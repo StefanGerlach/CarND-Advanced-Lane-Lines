@@ -15,6 +15,7 @@ Here the single modules will be called that do:
 
 import os
 import cv2
+import numpy as np
 import matplotlib.pyplot as plt
 
 from packages.camera_calibration import CameraCalibration
@@ -112,6 +113,8 @@ clip = cv2.VideoCapture(video_file)
 
 # Iterate all frames of the video
 frame_id = 0
+cv2.namedWindow("Lane Detection", cv2.WINDOW_NORMAL)
+
 while clip.isOpened():
     _, frame = clip.read()
     if frame is None:
@@ -140,14 +143,24 @@ while clip.isOpened():
     cv2.putText(lane_image, 'Vehicle is ' + str(abs(int(offset * 100) / 100.0)) + 'm' + offset_dir_text, (25, 150),
                 cv2.FONT_HERSHEY_SIMPLEX, 2, (200, 200, 200), 2)
 
-    cv2.imshow('mag', magnitude_img)
-    cv2.imshow('conditions', conditions_combination)
-    cv2.imshow('bin', binary_mask)
-    cv2.imshow('S_channel', s_channel)
-    cv2.imshow('transformed', frame_bird_eye)
-    cv2.imshow('lane', lane_image)
+    # Create a complete image of the intermediate debug-images
+    inpaint = np.zeros(shape=(1656, 1920, 3), dtype=np.uint8)
+    inpaint[0:1080, 0:1920, :] = cv2.resize(lane_image, (1920, 1080))
 
+    sub_imgs = [frame_bird_eye, s_channel, magnitude_img, conditions_combination, binary_mask]
+    sub_imgs_desc = ['Bird eye view', 'Saturation Channel', 'Edges Magnitude', 'Lane Pixels', 'Lane Detection']
+    sub_img_size = (576, 384)
 
+    for n in range(len(sub_imgs)):
+        # Draw text of description in the image
+        cv2.putText(sub_imgs[n], sub_imgs_desc[n], (25, 50), cv2.FONT_HERSHEY_SIMPLEX, 1.5, (200, 200, 200), 3)
+        # Put the sub image in final image
+        y_start = int(n * sub_img_size[1])
+        inpaint[1080:1656, y_start:y_start+sub_img_size[1], :] = cv2.resize(sub_imgs[n], (sub_img_size[1], sub_img_size[0]))
+
+    # Put Border for 16:9 scaling
+    inpaint = cv2.resize(cv2.copyMakeBorder(inpaint, 0, 0, 512, 512, cv2.BORDER_CONSTANT), (1920, 1080))
+    cv2.imshow('Lane Detection', inpaint)
     cv2.waitKey(1)
 
 clip.release()

@@ -17,7 +17,7 @@ class LaneDetectorPreprocessor(object):
         img = cv2.blur(img, ksize=(3, 3))
 
         # Extract the S - Channel from HLS-Colorspace of this frame
-        img_s = np.expand_dims(ColorTransformer.transformBGR2HLS(img)[:, :, 2], axis=-1)
+        img_s = np.expand_dims(ColorTransformer.transform_BGR2HLS(img)[:, :, 2], axis=-1)
 
         # Apply Contrast Limited Adaptive Histogram Equalization
         img_s[:, :, 0] = self._clahe.apply(img_s)
@@ -45,5 +45,9 @@ class LaneDetectorPreprocessor(object):
         # Filter with morphological operations (open)
         binary_mask = cv2.erode(binary_mask, np.ones((2, 2), np.uint8), 1)
         binary_mask = cv2.resize(binary_mask, (img.shape[1], img.shape[0]))
+
+        # Convert all to RGB
+        img_s = ColorTransformer.transform_GRAY2RGB(img_s)
+        mag = ColorTransformer.transform_GRAY2RGB(mag)
 
         return binary_mask, img_s, mag, conditions_combination
