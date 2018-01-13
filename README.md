@@ -71,6 +71,9 @@ To implement this step, I created the **CameraCalibration** class in packages\ca
 
 To better detect lane lines and reduce the area of the image to look for lane lines, it is usefull to create a warped version of the original frame. This warped version looks like from "the eyes of a bird", it displays the image content from the "top". This warping is called perspective transformation and can be done by multiplying the image pixel positions by a perspective transformation matrix.
 
+The class **PerspectiveTransform** in this repositiory (/packages/image_transform.py) uses OpenCV functions to compute a perspective transformation matrix (and its inverse). All that is needed to do this are 4 points in the source image and 4 points (e.g. defining a rectangle) in the destination image. With these 4 point correspondences and the OpenCV function *getPerspectiveTransform()* the transformation matrix is computed.
+
+I used 4 points in the original image, that define a rectangle that lays on the road lane and 4 points in the destination image, that define a rectangle in the image plane. The next image visualizes these rectangles with green lines and the point correspondences with red lines:
 ![Perspective Transformation][image6]
 
 
