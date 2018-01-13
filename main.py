@@ -49,8 +49,8 @@ transform_pts_b = [(128, 384), (384, 384), (384, 768), (128, 768)]
 
 # Video files
 video_file = 'project_video.mp4'
-# video_file = 'challenge_video.mp4'
-# video_file = 'harder_challenge_video.mp4'
+#video_file = 'challenge_video.mp4'
+#video_file = 'harder_challenge_video.mp4'
 
 """                                         """
 """ Part 1 Camera Calibration Preparation   """
@@ -184,5 +184,5 @@ clip.release()
 print('Creating Video.')
 
 video_file = output_video_file
-clip = ImageSequenceClip(output_video_frames, fps=30)
+clip = ImageSequenceClip(output_video_frames, fps=25)
 clip.write_videofile(video_file)

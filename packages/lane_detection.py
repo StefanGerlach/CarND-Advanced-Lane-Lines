@@ -37,9 +37,6 @@ class LaneDetector(object):
 
         return None, None
 
-    def __get_last_of_polynomials(self):
-        return self._poly_detections[-1]
-
     def __add_to_detections(self, detection):
         """
         Helper function to push an element in filter sequence
@@ -244,9 +241,6 @@ class LaneDetector(object):
         # Push the current polynomials to filter sequence
         if poly_left is not None and poly_right is not None:
             self.__add_to_poly_detections([poly_left, poly_right])
-        else:
-            # if the incoming polys are None, return the last
-            return self.__get_last_of_polynomials()
 
         # Get Mean of last n polynomials
         return self.__get_mean_of_polynomials()
