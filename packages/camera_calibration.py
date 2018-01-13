@@ -80,6 +80,8 @@ class CameraCalibration(object):
 
             # Chessboard detection
             res, chess_pts = cv2.findChessboardCorners(gray, self._chessboard_shape, None)
+            # Debug
+            # painted = cv2.drawChessboardCorners(img, self._chessboard_shape, chess_pts, res)
             if res:
                 objpoints.append(syn_objp)
                 imgpoints.append(chess_pts)
