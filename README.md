@@ -15,8 +15,10 @@
 [image10]: ./output_images/figure_1_col_sum.png "Column sum"
 [image11]: ./output_images/figure_2_binarize.png "Rectify signal"
 [image12]: ./output_images/figure_3_spikes.png "Identify peaks"
+[image13]: ./output_images/sliding_window_positions.png "Identify lane pixels"
+[image14]: ./output_images/radius_formula.png "Formula for calculation of radius of curvature"
 
-![Title image][image1]
+[![Youtube Link][image7]](https://youtu.be/iSw3WAGySTk "Udacity Self Driving Car ND Project 4 - Advanced Lane Finding")
 
 In this repository I describe my approach to write a software pipeline that identifies the lane of the road in front of a car in a video file. The precise requirements of this project are:
 
@@ -152,26 +154,59 @@ Given a binary signal, I use transitions from LOW to HIGH and HIGH to LOW for id
 
 ![peaks in signal][image12]
 
+The next step is calling the function:
+**find_lanes_hist_peaks_filter()**
+This function uses the previously computed peaks and uses them to find the two peaks that represent the lane lines. For this purpose, a list of the last m (m=30) peak pairs is used. If this list has enties, the last detected pair is used to find the nearst two peaks of the input list of peaks.
 
+If the list of last detections is empty, a new search is started. I simply take two peaks in the left and the right half of the image, that are nearest to the center. These two peaks are added to the list of last m detections.
 
-### Filtering 
-If the detection of the lane-polynomials succeeds in the current frame, this detected is pushed at the end of the list, and the first elements gets dropped. So I created a floating list of the last n detections and compute the mean over them for smoothness. 
+### Sliding window
+
+Next, the function **find_lanes_hist_peaks_lane_positions()** is called for identifying positions of valid lane line pixels. Using the two peaks from the previous function, I shift a sliding window of the size (42, 42) over the image. The scheme of shifting is from bottom to the top of the image.
+
+For every of the two peaks the shifting scheme can be desribed as:
+ 1. Start at the peak position in the bottom of the image.
+ 2. Go up vertically in y by 42 pixels (shape of sliding window).
+ 3. Shift around the previous x position in a range of -shift_range and +shift_range.
+ 4. A valid position is found, if *intensity_threshold* (0.1) percent of pixels under the window is 1.
+ 5. Repeat at 2. until reaching the top of the image. 
+
+Given these positions of valid rectangles for each lane, I use these rectangles for masking the left and right lane line pixels in function **find_lanes_hist_peaks_lane_pixels()**. The following image show the result of this pipeline (initial two peaks are inpainted as rectangle as well):
+
+![Visualize lane pixels][image13]
+
+Now that the pixels for the left and right lanes are identified, I use the numpy function **polyfit** for fitting a polynomial of **f(x) = A*x^2 + B*x + C** into these points (in function **fit_poly()**).
+
 
 ### Sanity Check
-To sanity check the detection, I used a thresholding method. Given the left and right polynomials by:
+To sanity check the detection, I used a thresholding method in **sanity_check_poly()**. Given the left and right polynomials by:
 
 **Polynomial left**: f_left(x) = A_left * x^2 + B_left * x + C_left
 
 **Polynomial right**: f_right(x) = A_right * x^2 + B_right * x + C_right
 
-I calculated abs_diff_B = abs(B_left - B_right) and discarded the polynomials if abs_diff_B exceeds a value of 0.2.
+I calculated abs_diff_B = abs(B_left - B_right) and discarded the polynomials if abs_diff_B exceeds a value of 0.2. If the current detection is dropped, I set the mean of the last n (n=20) polynomials in the filtering method, described in the next part.
 
 
-
-
+### Filtering 
+If the detection of the lane-polynomials succeeds in the current frame, this detected is pushed at the end of the list, and the first elements gets dropped. So I created a floating list of the last n detections and compute the mean over them for smoothness. This happens in the function **filter_poly()**.
 
 
 ## Determine the curvature of the lane and vehicle position with respect to center
+
+To determine the curvature of the current detection, I use the given **xm** and **ym** scaling factors to translate pixel coordinates into meters. I recalculate the polyomials with rescaled pixel coordinates, to get polynomials in world coordinate system. with the help of the given [Tutorial](https://www.intmath.com/applications-differentiation/8-radius-curvature.php) and example code, I used the formula
+
+![Radius formula][image14]
+
+to calculate the respective radii in my function **calc_radius_offset_poly()**.
+
+Additionally, having the starting points of the polynomials at the bottom of the image, I computed the distance of the lane center to the image center and converted it into world space, resulting in plausible world coordinates. 
+
+## Generating visualization
+
+For a nice visualization of the lane detection, I draw the polygon of the lane into the warped image, and warp it back to the original image space with the inverse transformation using my class **PerspectiveTransform**. The lane is inpainted in green, if the current frame has a valid (in sense of sanity check) detection, otherwise it will be painted in orange. For the distance to the center of the lane of the vehicle and the radius of curvature of the lane, I inpaint the values using OpenCVs putText() function.
+
+I concatenate the 'bird-eye' view image, the S-channel image, the magnitude of gradients image, the composite binarization image and finally an image containing a combination of lane rectangle positions, lane pixels and the polynomials.
 
 
 ## Result
