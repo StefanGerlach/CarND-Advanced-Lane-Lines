@@ -204,7 +204,9 @@ Additionally, having the starting points of the polynomials at the bottom of the
 
 ## Generating visualization
 
+For a nice visualization of the lane detection, I draw the polygon of the lane into the warped image, and warp it back to the original image space with the inverse transformation using my class **PerspectiveTransform**. The lane is inpainted in green, if the current frame has a valid (in sense of sanity check) detection, otherwise it will be painted in orange.
 
+I concatenate the 'bird-eye' view image, the S-channel image, the magnitude of gradients image, the composite binarization image and finally an image containing a combination of lane rectangle positions, lane pixels and the polynomials.
 
 
 ## Result
