@@ -12,6 +12,9 @@
 [image7]: ./output_images/video.png "YT Link"
 [image8]: ./output_images/pipeline_gradients.png "Preprocessing pipeline"
 [image9]: ./output_images/pipeline_complete.png "Binarization pipeline"
+[image10]: ./output_images/figure_1_col_sum.png "Column sum"
+[image11]: ./output_images/figure_2_binarize.png "Rectify signal"
+[image12]: ./output_images/figure_3_spikes.png "Identify peaks"
 
 ![Title image][image1]
 
@@ -94,27 +97,78 @@ To detect the lane pixels correctly, I created the **LaneDetectorPreprocessor** 
 The pipeline I used is highly inspired by the course content of the project chapter. It uses the following steps:
 
 **Preprocessing pipeline:**
- * Gaussian blur image with filter of size (3, 3).
+
+ * Gaussian blur the image with a filter of size (3, 3).
  * Convert image from BGR into HLS colorspace.
  * Apply Contrast Limited Adaptive Histogram Equalization on S-Channel.
  * Use S-Channel for Sobel-Filtering in X and Y.
  * Compute magnitude and direction of gradients images.
  * Use S-Channel for thresholding: t_low < g < t_high.
  * Use magnitude and direction of gradients images for thresholding: 
-      (tm_low < mag < tm_high) AND (td_low < dir < td_high)
+ *  -> (tm_low < mag < tm_high) AND (td_low < dir < td_high)
      
  * Combine (OR) both thresholded images.
  * Use morphological filter for refinement of structures (erode).
  
+I empirically chose the following threshold values:
+
+| Threshold | t_low | t_high | tm_low | tm_high | td_low | td_high |
+| --------- | ----- | ------ | ------ | ------- | ------ | ------- |
+| Value     | 200   | 255    | 15     | 255     | 0.0    | 0.78    |
+ 
+
+#### First steps of preprocessing
+---
 The following image visualizes the first steps of the preprocessing pipeline:
 ![Preprocessing pipeline][image8]
 
+
+#### Final steps of preprocessing and binarization 
+---
 Finally, this image displays the combined thresholding methods that leads to the final binary image:
 ![Binarization][image9]
 
 
+Given that final binarized image of the warped version of the orignal frame, the detection of the left and right lane line pixels can start.
+
 
 ## Detect lane pixels and fit to find the lane boundary
+
+For precise detection of the lane lines, I created the class **LaneDetector** (packages/lane_detection.py). This class manages the detection of left and right lane line in the warped and thresholded image. Additionally it holds a list of the last n (n=20) detected lane-polynomials for smoothness filtering. 
+
+### Processing pipeline
+The code is inspired by the course material and uses the following functions:
+
+**find_lanes_hist_peaks_initial()**
+This function uses the binary mask and computes the column-sums over the lower half of the image. The colum-sum looks like this:
+
+![Colum sum signal][image10]
+
+I use a sliding window with size 30 and compute the sum over this window. If the sum exceeds a threshold of 10000, I set the resulting signal to 1, else 0. With this method I binarize the signal. The result has an offset of filter_size / 2 (orange line is binarized signal, normalized for visualization):
+
+![binarized signal][image11]
+
+Given a binary signal, I use transitions from LOW to HIGH and HIGH to LOW for identifying peaks. Because I know the filter lengths, I can correct the offset of the signal (green signal represents the detected peaks):
+
+![peaks in signal][image12]
+
+
+
+### Filtering 
+If the detection of the lane-polynomials succeeds in the current frame, this detected is pushed at the end of the list, and the first elements gets dropped. So I created a floating list of the last n detections and compute the mean over them for smoothness. 
+
+### Sanity Check
+To sanity check the detection, I used a thresholding method. Given the left and right polynomials by:
+
+**Polynomial left**: f_left(x) = A_left * x^2 + B_left * x + C_left
+
+**Polynomial right**: f_right(x) = A_right * x^2 + B_right * x + C_right
+
+I calculated abs_diff_B = abs(B_left - B_right) and discarded the polynomials if abs_diff_B exceeds a value of 0.2.
+
+
+
+
 
 
 ## Determine the curvature of the lane and vehicle position with respect to center
