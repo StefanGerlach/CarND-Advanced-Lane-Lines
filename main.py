@@ -127,6 +127,8 @@ while clip.isOpened():
         break
 
     frame_id += 1
+    if frame_id < 327:
+        continue
 
     # Undistort the camera radial distortion
     frame = camera_cal.undistort_image(frame, calibration_dict=cal)
