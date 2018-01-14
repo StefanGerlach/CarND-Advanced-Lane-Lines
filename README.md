@@ -18,7 +18,7 @@
 [image13]: ./output_images/sliding_window_positions.png "Identify lane pixels"
 [image14]: ./output_images/radius_formula.png "Formula for calculation of radius of curvature"
 
-![Title image][image1]
+[![Youtube Link][image7]](https://youtu.be/iSw3WAGySTk "Udacity Self Driving Car ND Project 4 - Advanced Lane Finding")
 
 In this repository I describe my approach to write a software pipeline that identifies the lane of the road in front of a car in a video file. The precise requirements of this project are:
 
