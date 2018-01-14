@@ -149,11 +149,8 @@ class LaneDetector(object):
         This function will detect the lane pixels from seed peak points.
         :param bin_warped_img: The warped binary image.
         :param seed_peaks: Exactly two peaks as seeds.
-        :return: mask_left_lane, mask_right_lane
+        :return: lane positions, coordinates of valid rectangles
         """
-        mask_left_lane = np.zeros_like(bin_warped_img)
-        mask_right_lane = np.zeros_like(bin_warped_img)
-
         if seed_peaks is None:
             return None, None
 
