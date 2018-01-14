@@ -3,12 +3,17 @@
 
 [//]: # (Image References)
 
+[image1]: ./output_images/main_image.png "Splash"
 [image2]: ./output_images/camera_cal_test.png "Camera Calibration"
 [image3]: ./output_images/chessboard_detect.png "Camera Calibration Chessboard"
 [image4]: ./output_images/frame_undistort.png "Camera Calibration Video Frame"
 [image5]: ./output_images/diff_img.png "Camera Calibration Video Frame Difference Image"
 [image6]: ./output_images/warp_perspective.png "Warp Perspective"
 [image7]: ./output_images/video.png "YT Link"
+[image8]: ./output_images/pipeline_gradients.png "Preprocessing pipeline"
+[image9]: ./output_images/pipeline_complete.png "Binarization pipeline"
+
+![Title image][image1]
 
 In this repository I describe my approach to write a software pipeline that identifies the lane of the road in front of a car in a video file. The precise requirements of this project are:
 
@@ -79,7 +84,40 @@ I used 4 points in the original image, that define a rectangle that lays on the 
 ![Perspective Transformation][image6]
 
 
-At this point I continued working with all other algorithms on the transformed image, because only the necessary image information are contained in the warped image. Additionally computation time was reduced, working on the warped image with size (512, 786) instead of the original image size (1280, 720).
+At this point I continued working with all other algorithms on the transformed image, because all necessary information are contained in the warped image. Additionally computation time was reduced, working on the warped image with size (512, 786) instead of the original image size (1280, 720).
+
+
+## Use color transforms and gradients to create a thresholded binary image
+
+To detect the lane pixels correctly, I created the **LaneDetectorPreprocessor** class (packages/image_preprocessing.py) that is used to create a binary image out of the warped image. In that binary image, only the lane line pixels should be at 255, every other pixel should be 0. 
+
+The pipeline I used is highly inspired by the course content of the project chapter. It uses the following steps:
+
+**Preprocessing pipeline:**
+ * Gaussian blur image with filter of size (3, 3).
+ * Convert image from BGR into HLS colorspace.
+ * Apply Contrast Limited Adaptive Histogram Equalization on S-Channel.
+ * Use S-Channel for Sobel-Filtering in X and Y.
+ * Compute magnitude and direction of gradients images.
+ * Use S-Channel for thresholding: t_low < g < t_high.
+ * Use magnitude and direction of gradients images for thresholding: 
+      (tm_low < mag < tm_high) AND (td_low < dir < td_high)
+     
+ * Combine (OR) both thresholded images.
+ * Use morphological filter for refinement of structures (erode).
+ 
+The following image visualizes the first steps of the preprocessing pipeline:
+![Preprocessing pipeline][image8]
+
+Finally, this image displays the combined thresholding methods that leads to the final binary image:
+![Binarization][image9]
+
+
+
+## Detect lane pixels and fit to find the lane boundary
+
+
+## Determine the curvature of the lane and vehicle position with respect to center
 
 
 ## Result
@@ -91,3 +129,14 @@ The Debug-images in the lower part display (from left to right) the bird eye vie
 Please click on the image to watch the video on YouTube:
 [![Youtube Link][image7]](https://youtu.be/iSw3WAGySTk "Udacity Self Driving Car ND Project 4 - Advanced Lane Finding")
 
+
+## Reflection
+
+Some drawbacks and ideas about this project:
+
+ * The described image processing pipeline is quite restricted to the supplied video material.
+ * There are a lot of pre-defined thresholds, that make the pipeline less dynamic.
+ * Methods of machine learning could help to improve the pipeline.
+ * In detail, a classifier could be trained on image patches that contain road lane lines/ road border or not.
+ * Furthermore, a semantic segmentation network could be used for detailed scene understanding.
+ 
