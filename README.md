@@ -160,7 +160,7 @@ This function uses the previously computed peaks and uses them to find the two p
 
 If the list of last detections is empty, a new search is started. I simply take two peaks in the left and the right half of the image, that are nearest to the center. These two peaks are added to the list of last m detections.
 
-#### Sliding window
+### Sliding window
 
 Next, the function **find_lanes_hist_peaks_lane_positions()** is called for identifying positions of valid lane line pixels. Using the two peaks from the previous function, I shift a sliding window of the size (42, 42) over the image. The scheme of shifting is from bottom to the top of the image.
 
@@ -178,7 +178,7 @@ Given these positions of valid rectangles for each lane, I use these rectangles 
 Now that the pixels for the left and right lanes are identified, I use the numpy function **polyfit** for fitting a polynomial of **f(x) = A*x^2 + B*x + C** into these points (in function **fit_poly()**).
 
 
-#### Sanity Check
+### Sanity Check
 To sanity check the detection, I used a thresholding method in **sanity_check_poly()**. Given the left and right polynomials by:
 
 **Polynomial left**: f_left(x) = A_left * x^2 + B_left * x + C_left
@@ -188,7 +188,7 @@ To sanity check the detection, I used a thresholding method in **sanity_check_po
 I calculated abs_diff_B = abs(B_left - B_right) and discarded the polynomials if abs_diff_B exceeds a value of 0.2. If the current detection is dropped, I set the mean of the last n (n=20) polynomials in the filtering method, described in the next part.
 
 
-#### Filtering 
+### Filtering 
 If the detection of the lane-polynomials succeeds in the current frame, this detected is pushed at the end of the list, and the first elements gets dropped. So I created a floating list of the last n detections and compute the mean over them for smoothness. This happens in the function **filter_poly()**.
 
 
