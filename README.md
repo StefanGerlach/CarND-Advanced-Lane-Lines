@@ -146,11 +146,11 @@ This function uses the binary mask and computes the column-sums over the lower h
 
 ![Colum sum signal][image10]
 
-I use a sliding window with size 30 and compute the sum over this window. If the sum exceeds a threshold of 10000, I set the resulting signal to 1, else 0. With this method I binarize the signal. The result has an offset of filter_size / 2 (orange line is binarized signal, normalized for visualization):
+I use a sliding window with size 30 and compute the sum over this window. If the sum exceeds a threshold of 10000, I set the resulting signal to 1, else 0. With this method I binarize the signal. The result has a corrected offset of length *filter_size / 2* (orange line is binarized signal, normalized for visualization):
 
 ![binarized signal][image11]
 
-Given a binary signal, I use transitions from LOW to HIGH and HIGH to LOW for identifying peaks. Because I know the filter lengths, I can correct the offset of the signal (green signal represents the detected peaks):
+Given a binary signal, I use transitions from LOW to HIGH and HIGH to LOW for identifying peaks (green signal represents the detected peaks):
 
 ![peaks in signal][image12]
 
